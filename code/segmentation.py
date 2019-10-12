@@ -235,8 +235,16 @@ def mypca(X):
     # ------------------------------------------------------------------#
     # TODO: Calculate covariance matrix of X, find eigenvalues and eigenvectors,
     # sort them, and rotate X using the eigenvectors
-
     # ------------------------------------------------------------------#
+
+    sigma = np.cov(X.T)
+    w, v = np.linalg.eig(sigma)
+
+    ix = np.argsort(w)[::-1]
+    w = w[ix]
+    v = v[:, ix]
+
+    X_pca = v.T.dot(X.T).T
 
     # Return fraction of variance
     fraction_variance = np.zeros((X_pca.shape[1], 1))

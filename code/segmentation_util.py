@@ -5,6 +5,8 @@ Utility functions for segmentation.
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import scipy.ndimage
+import segmentation as seg
 
 
 def ngradient(fun, x, h=1e-3):
@@ -94,27 +96,33 @@ def extract_features(image_number, slice_number):
     base_dir = '../data/dataset_brains/'
 
     t1 = plt.imread(base_dir + str(image_number) + '_' + str(slice_number) + '_t1.tif')
+    t1g = scipy.ndimage.gaussian_filter(t1, sigma=1)
+
     t2 = plt.imread(base_dir + str(image_number) + '_' + str(slice_number) + '_t2.tif')
+    t2g = scipy.ndimage.gaussian_filter(t1, sigma=1)
 
     n = t1.shape[0]
     features = ()
 
-    t1f = t1.flatten().T.astype(float)
-    t1f = t1f.reshape(-1, 1)
-    t2f = t2.flatten().T.astype(float)
-    t2f = t2f.reshape(-1, 1)
+    t1f = t1.flatten().T.astype(float).reshape(-1, 1)
+    t1gf = t1g.flatten().T.astype(float).reshape(-1, 1)
+
+    t2f = t2.flatten().T.astype(float).reshape(-1, 1)
+    t2gf = t2g.flatten().T.astype(float).reshape(-1, 1)
+
+    r, _ = seg.extract_coordinate_feature(t1)
 
     X = np.concatenate((t1f, t2f), axis=1)
-    X = np.concatenate((X, t1f - t2f), axis=1)
+    X = np.concatenate((X, t1gf), axis=1)
+    X = np.concatenate((X, t2gf), axis=1)
+    # X = np.concatenate((X, r), axis=1)
 
     features += ('T1 intensity',)
     features += ('T2 intensity',)
-    features += ('T1 intensity - T2 intensity',)
+    features += ('T1 intensity gaussian filter',)
+    features += ('T2 intensity gaussian filter',)
+    # features += ('distance to center',)
 
-    # ------------------------------------------------------------------#
-    # TODO: Extract more features and add them to X.
-    # Don't forget to provide (short) descriptions for the features
-    # ------------------------------------------------------------------#
     return X, features
 
 

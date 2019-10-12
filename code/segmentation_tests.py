@@ -5,10 +5,10 @@ Test code for segmentation module in 8DC00 course
 # Imports
 
 import numpy as np
+import segmentation as seg
 import segmentation_util as util
 import matplotlib.pyplot as plt
-import segmentation as seg
-from scipy import ndimage, stats
+from scipy import ndimage, stats, spatial
 import scipy
 from sklearn.neighbors import KNeighborsClassifier
 import timeit
@@ -392,12 +392,14 @@ def knn_curve():
 
 def learning_curve():
     # Load training and test data
-    train_data, train_labels = seg.generate_gaussian_data(1000)
-    test_data, test_labels = seg.generate_gaussian_data(1000)
-    [train_data, test_data] = seg.normalize_data(train_data, test_data)
+    # train_data, train_labels = seg.generate_gaussian_data(1000)
+    train_data, train_labels, _ = util.create_dataset(1, 1, 'brain')
+    # test_data, test_labels = seg.generate_gaussian_data(1000)
+    test_data, test_labels, _ = util.create_dataset(2, 1, 'brain')
+    train_data, test_data = seg.normalize_data(train_data, test_data)
 
     # Define parameters
-    train_sizes = np.array([1, 3, 10, 30, 100, 300])
+    train_sizes = np.logspace(0.1, 3.0, num=15).astype(int)
     k = 1
     num_iter = 3  # How often to repeat the experiment
 
@@ -407,9 +409,10 @@ def learning_curve():
     test_dice = np.empty([len(train_sizes), num_iter])
     test_dice[:] = np.nan
 
-    # ------------------------------------------------------------------#
-    # TODO: Store errors for training data
-    # ------------------------------------------------------------------#
+    train_error = np.empty([len(train_sizes), num_iter])
+    train_error[:] = np.nan
+    train_dice = np.empty([len(train_sizes), num_iter])
+    train_dice[:] = np.nan
 
     ## Train and test with different values
     for i in np.arange(len(train_sizes)):
@@ -432,30 +435,43 @@ def learning_curve():
             test_error[i, j] = util.classification_error(test_labels, predicted_test_labels)
             test_dice[i, j] = util.dice_overlap(test_labels, predicted_test_labels)
 
-            # ------------------------------------------------------------------#
-            # TODO: Predict training labels and evaluate
-            # ------------------------------------------------------------------#
+            predicted_train_labels = neigh.predict(train_data).astype(bool)
+            train_labels_bool = train_labels.astype(bool)
+
+            train_error[i, j] = util.classification_error(train_labels_bool, predicted_train_labels)
+            train_dice[i, j] = util.dice_overlap(train_labels_bool, predicted_train_labels)
 
     ## Display results
     fig = plt.figure(figsize=(8, 8))
-    ax1 = fig.add_subplot(111)
+    gs = fig.add_gridspec(2, 2)
+    ax1 = fig.add_subplot(gs[0, :])
+    ax2 = fig.add_subplot(gs[1, :])
     x = np.log(train_sizes)
-    y_test = np.mean(test_error, 1)
-    yerr_test = np.std(test_error, 1)
-    p1 = ax1.errorbar(x, y_test, yerr=yerr_test, label='Test error')
+    ticks = list(x)
+    tick_lbls = [str(i) for i in train_sizes]
 
-    # ------------------------------------------------------------------#
-    # TODO: Plot training size
-    # ------------------------------------------------------------------#
+    y_test = np.mean(test_error, 1)
+    y_train = np.mean(train_error, 1)
+
+    yerr_test = np.std(test_error, 1)
+    yerr_train = np.std(train_error, 1)
+
+    p1 = ax1.errorbar(x, y_test, yerr=yerr_test, label='Test error')
+    p2 = ax2.errorbar(x, y_train, yerr=yerr_train, label='Train error')
 
     ax1.set_xlabel('Number of training samples (k)')
     ax1.set_ylabel('error')
-    ticks = list(x)
     ax1.set_xticks(ticks)
-    tick_lbls = [str(i) for i in train_sizes]
     ax1.set_xticklabels(tick_lbls)
     ax1.grid()
     ax1.legend()
+
+    ax2.set_xlabel('Number of training samples (k)')
+    ax2.set_ylabel('error')
+    ax2.set_xticks(ticks)
+    ax2.set_xticklabels(tick_lbls)
+    ax2.grid()
+    ax2.legend()
 
 
 def feature_curve(use_random=False):
@@ -464,10 +480,7 @@ def feature_curve(use_random=False):
     test_data, test_labels, test_feature_labels = util.create_dataset(2, 1, 'brain')
 
     if use_random:
-        # ------------------------------------------------------------------#
-        # TODO: Replace features by random numbers, of the same size as the data
-        # ------------------------------------------------------------------#
-        pass
+        train_data = np.random.randn(train_data.shape[0], train_data.shape[1])
 
     # Normalize data
     train_data, test_data = seg.normalize_data(train_data, test_data)
@@ -564,9 +577,14 @@ def high_dimensions_output(X, ax, n_bins=20):
     # Plot histogram
     ax.hist(D.flatten(), bins=n_bins)
 
-    # ------------------------------------------------------------------#
-    # TODO: Mean, maximum distance, and average nearest neighbor distance
-    # ------------------------------------------------------------------#
+    mn = np.mean(D)
+    mx = np.max(D)
+
+    mns = 0
+    for n, i in enumerate(D):
+        mns += np.min(np.delete(i, n, None), axis=None)
+    mns = mns / len(X)
+
     return mn, mx, mns
 
 
@@ -577,26 +595,25 @@ def covariance_matrix_test():
     sigma1 = [[3, 1], [1, 1]]
     sigma2 = [[3, 1], [1, 1]]
     X, Y = seg.generate_gaussian_data(N, mu1, mu2, sigma1, sigma2)
-    # ------------------------------------------------------------------#
-    # TODO: Calculate the mean and covariance matrix of the data,
-    #  and compare them to the parameters you used as input.
-    # ------------------------------------------------------------------#
+
+    sigma = np.cov(X.T)
+    mu = np.mean(X, axis=0)
+
+    return X, Y, sigma
 
 
 def eigen_vecval_test(sigma):
-    # ------------------------------------------------------------------#
-    # TODO: Compute the eigenvectors and eigenvalues of the covariance matrix,
-    #  what two properties can you name about the eigenvectors? How can you verify these properties?
-    #  which eigenvalue is the largest and which is the smallest?
-    # ------------------------------------------------------------------#
-    pass
+    w, v = np.linalg.eig(sigma)
+
+    ix = np.argsort(w)[::-1]
+    w = w[ix]
+    v = v[:, ix]
+
+    return v, w
 
 
 def rotate_using_eigenvectors_test(X, Y, v):
-    # ------------------------------------------------------------------#
-    # TODO: Rotate X using the eigenvectors
-    # ------------------------------------------------------------------#
-    pass
+    return v.T.dot(X.T)
 
 
 def test_mypca():
