@@ -301,7 +301,6 @@ def ngradient(fun, x, h=1e-3):
 
         g[i] = (y1 - y2) / h
 
-
     return g
 
 
