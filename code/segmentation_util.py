@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
+
 def ngradient(fun, x, h=1e-3):
     # Computes the derivative of a function with numerical differentiation.
     # Input:
@@ -14,14 +15,27 @@ def ngradient(fun, x, h=1e-3):
     # h - a small positive number used in the finite difference formula
     # Output:
     # g - vector of partial derivatives (gradient) of fun
-
-    #------------------------------------------------------------------#
+    # ------------------------------------------------------------------#
     # TODO: Implement the  computation of the partial derivatives of
     # the function at x with numerical differentiation.
     # g[k] should store the partial derivative w.r.t. the k-th parameter
-    #------------------------------------------------------------------#
+    # ------------------------------------------------------------------#
+    g = np.zeros_like(x)
+
+    for i in range(len(x)):
+        par1 = x.copy()
+        par2 = x.copy()
+
+        par1[i] += h / 2
+        par2[i] -= h / 2
+
+        y1 = fun(par1)
+        y2 = fun(par2)
+
+        g[i] = (y1 - y2) / h
 
     return g
+
 
 def scatter_data(X, Y, feature0=0, feature1=1, ax=None):
     # scater_data displays a scatterplot of at most 1000 samples from dataset X, and gives each point
@@ -30,20 +44,20 @@ def scatter_data(X, Y, feature0=0, feature1=1, ax=None):
     k = 1000
     if len(X) > k:
         idx = np.random.randint(len(X), size=k)
-        X = X[idx,:]
+        X = X[idx, :]
         Y = Y[idx]
 
     class_labels, indices1, indices2 = np.unique(Y, return_index=True, return_inverse=True)
     if ax is None:
-        fig = plt.figure(figsize=(8,8))
+        fig = plt.figure(figsize=(8, 8))
         ax = fig.add_subplot(111)
         ax.grid()
 
     colors = cm.rainbow(np.linspace(0, 1, len(class_labels)))
     for i, c in zip(np.arange(len(class_labels)), colors):
         idx2 = indices2 == class_labels[i]
-        lbl = 'X, class '+str(i)
-        ax.scatter(X[idx2,feature0], X[idx2,feature1], color=c, label=lbl)
+        lbl = 'X, class ' + str(i)
+        ax.scatter(X[idx2, feature0], X[idx2, feature1], color=c, label=lbl)
 
     return ax
 
@@ -59,10 +73,10 @@ def create_dataset(image_number, slice_number, task):
     # Y           - Nx1 vector with labels
     # feature_labels - kx1 cell array with descriptions of the k features
 
-    #Extract features from the subject/slice
+    # Extract features from the subject/slice
     X, feature_labels = extract_features(image_number, slice_number)
 
-    #Create labels
+    # Create labels
     Y = create_labels(image_number, slice_number, task)
 
     return X, Y, feature_labels
@@ -91,14 +105,16 @@ def extract_features(image_number, slice_number):
     t2f = t2f.reshape(-1, 1)
 
     X = np.concatenate((t1f, t2f), axis=1)
+    X = np.concatenate((X, t1f - t2f), axis=1)
 
     features += ('T1 intensity',)
     features += ('T2 intensity',)
+    features += ('T1 intensity - T2 intensity',)
 
-    #------------------------------------------------------------------#
+    # ------------------------------------------------------------------#
     # TODO: Extract more features and add them to X.
     # Don't forget to provide (short) descriptions for the features
-    #------------------------------------------------------------------#
+    # ------------------------------------------------------------------#
     return X, features
 
 
@@ -125,18 +141,18 @@ def create_labels(image_number, slice_number, task):
     # 7 cortical grey matter
     # 8 cerebrospinal fluid in the extracerebral space
 
-    #Read the ground-truth image
+    # Read the ground-truth image
     base_dir = '../data/dataset_brains/'
 
     I = plt.imread(base_dir + str(image_number) + '_' + str(slice_number) + '_gt.tif')
 
     if task == 'brain':
-        Y = I>0
+        Y = I > 0
     elif task == 'brain':
         white_matter = I == 2 | I == 5
-        gray_matter  = I == 7 | I == 3
-        csf         = I == 4 | I == 8
-        background  = I == 0 |  I == 1 | I == 6
+        gray_matter = I == 7 | I == 3
+        csf = I == 4 | I == 8
+        background = I == 0 | I == 1 | I == 6
         Y = I
         Y[background] = 0
         Y[white_matter] = 1
@@ -147,7 +163,7 @@ def create_labels(image_number, slice_number, task):
         raise ValueError("Variable 'task' must be one of two values: 'brain' or 'tissue'")
 
     Y = Y.flatten().T
-    Y = Y.reshape(-1,1)
+    Y = Y.reshape(-1, 1)
 
     return Y
 
@@ -166,15 +182,18 @@ def dice_overlap(true_labels, predicted_labels, smooth=1.):
     t = true_labels.flatten()
     p = predicted_labels.flatten()
 
-    #------------------------------------------------------------------#
+    # ------------------------------------------------------------------#
     # TODO: Implement the missing functionality for Dice overlap
-    #------------------------------------------------------------------#
+    # ------------------------------------------------------------------#
+    tp = (t * p).astype(int)
+    dice = 2 * np.sum(tp) / (2 * np.sum(tp) + np.sum(t != p))
+
     return dice
 
 
 def dice_multiclass(true_labels, predicted_labels):
-    #dice_multiclass.m returns the Dice coefficient for two label vectors with
-    #multiple classses
+    # dice_multiclass.m returns the Dice coefficient for two label vectors with
+    # multiple classses
     #
     # Input:
     # true_labels         Nx1 vector with the true labels
@@ -188,13 +207,13 @@ def dice_multiclass(true_labels, predicted_labels):
     dice_score = np.empty((len(all_classes), 1))
     dice_score[:] = np.nan
 
-    #Consider each class as the foreground class
+    # Consider each class as the foreground class
     for i in np.arange(len(all_classes)):
         idx2 = indices2 == all_classes[i]
-        lbl = 'X, class '+ str(all_classes[i])
+        lbl = 'X, class ' + str(all_classes[i])
         temp_true = true_labels.copy()
-        temp_true[true_labels == all_classes[i]] = 1  #Class i is foreground
-        temp_true[true_labels != all_classes[i]] = 0  #Everything else is background
+        temp_true[true_labels == all_classes[i]] = 1  # Class i is foreground
+        temp_true[true_labels != all_classes[i]] = 0  # Everything else is background
 
         temp_predicted = predicted_labels.copy();
         print(temp_predicted.dtype)
@@ -223,12 +242,9 @@ def classification_error(true_labels, predicted_labels):
     t = true_labels.flatten()
     p = predicted_labels.flatten()
 
-    #------------------------------------------------------------------#
+    # ------------------------------------------------------------------#
     # TODO: Implement the missing functionality for classification error
-    #------------------------------------------------------------------#
+    # ------------------------------------------------------------------#
+    err = np.sum(t != p) / t.shape
+
     return err
-
-
-
-
-

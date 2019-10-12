@@ -7,11 +7,12 @@ Segmentation module code for 8DC00 course
 import numpy as np
 import scipy
 from sklearn.neighbors import KNeighborsClassifier
+import segmentation_util as util
 
 
 # SECTION 1. Segmentation in feature space
 
-def generate_gaussian_data(N=100, mu1=[0,0], mu2=[2,0], sigma1=[[1,0],[0,1]], sigma2=[[1,0],[0,1]]):
+def generate_gaussian_data(N=100, mu1=[0, 0], mu2=[2, 0], sigma1=[[1, 0], [0, 1]], sigma2=[[1, 0], [0, 1]]):
     # Generates a 2D toy dataset with 2 classes, N samples per class. 
     # Class 1 is Gaussian distributed with mu1 and sigma2
     # Class 2 is Gaussian distributed with mu2 and sigma2. 
@@ -23,18 +24,19 @@ def generate_gaussian_data(N=100, mu1=[0,0], mu2=[2,0], sigma1=[[1,0],[0,1]], si
     # mu2           - 1x2 vector, mean of class 2 
     # sigma1        - 2x2 matrix, covariance of class 1 
     # sigma2        - 2x2 matrix, covariance of class 2 
-    
+
     # Generate class 1
     A = np.linalg.cholesky(sigma1)
-    data1 = np.random.randn(N,2).dot(A) + mu1     #Rotate data according to covariance matrix (must be positive definite!), and add the mean
+    data1 = np.random.randn(N, 2).dot(
+        A) + mu1  # Rotate data according to covariance matrix (must be positive definite!), and add the mean
     # Generate class 2
     B = np.linalg.cholesky(sigma2)
-    data2 = np.random.randn(N,2).dot(B) + mu2
-    
+    data2 = np.random.randn(N, 2).dot(B) + mu2
+
     # Put the data together
     X = np.concatenate((data1, data2), axis=0)
     # Create labels
-    Y = np.concatenate((np.zeros((N,1)), np.ones((N,1))), axis=0)
+    Y = np.concatenate((np.zeros((N, 1)), np.ones((N, 1))), axis=0)
 
     return X, Y
 
@@ -48,23 +50,20 @@ def extract_coordinate_feature(im):
     # c  -   A (N*M)x1 vector which encodes how far each pixel is from the center of the image
 
     # Get the image size
-    n_rows, n_cols = im.shape   
-    
+    n_rows, n_cols = im.shape
+
     # Find image center
-    x_center = np.floor(n_rows/2);
-    y_center = np.floor(n_cols/2);
-    
+    x_center = np.floor(n_rows / 2)
+    y_center = np.floor(n_cols / 2)
+
     # Generate coordinate images
-    ar = np.arange(n_cols).reshape(1,-1)
+    ar = np.arange(n_cols).reshape(1, -1)
     x_coord = np.tile(ar, (n_rows, 1))
     ar = ar.T
     y_coord = np.tile(ar, (1, n_cols))
-    
-    #------------------------------------------------------------------#
-    # TODO: Use the above variables to create an image coord_im
-    # that combines the information from x_coord and y_coord 
-    #------------------------------------------------------------------#
-    
+
+    coord_im = np.sqrt((x_coord - x_center) ** 2 + (y_coord - y_center) ** 2)
+
     # Create a feature from the coordinate image
     c = coord_im.flatten().T
     c = c.reshape(-1, 1)
@@ -83,10 +82,10 @@ def normalize_data(train_data, test_data=None):
     # Output:
     # train_data            num_train x k dataset with Ntrain samples and k features, that has been normalized by trainX
     # test_data            (Optional output) num_test x k dataset with Ntest samples and k features, that has been normalized by trainX 
-    
-    #Find mean and standard deviation of trainX
-    mean_train = np.mean(train_data,axis=0)
-    std_train = np.std(train_data,axis=0)
+
+    # Find mean and standard deviation of trainX
+    mean_train = np.mean(train_data)
+    std_train = np.std(train_data)
 
     # Subtract mean
     train_data = train_data - mean_train
@@ -95,7 +94,7 @@ def normalize_data(train_data, test_data=None):
     train_data = train_data / std_train
 
     # (Optional) If testX needs to be normalized also - note it is normalized by
-    #the mean and variance of trainX, not testX! 
+    # the mean and variance of trainX, not testX!
     if test_data is not None:
         test_data = test_data - mean_train
         test_data = test_data / std_train
@@ -105,21 +104,19 @@ def normalize_data(train_data, test_data=None):
 
 def cost_kmeans(X, w_vector):
     # Computes the cost of assigning data in X to clusters in w_vector 
-    
+
     # Get the data dimensions
     n, m = X.shape
 
     # Number of clusters
-    K = int(len(w_vector)/m)
+    K = int(len(w_vector) / m)
 
     # Reshape cluster centers into dataset format
     W = w_vector.reshape(K, m)
 
-    #------------------------------------------------------------------#
-    # TODO: Find distance of each point to each cluster center
-    # Then find the minimum distances min_dist and indices min_index
-    # Then calculate the cost
-    #------------------------------------------------------------------#
+    D = scipy.spatial.distance.cdist(X, W, metric='euclidean')
+    J = np.sum(np.min(D, axis=1)) / n
+
     return J
 
 
@@ -133,9 +130,10 @@ def kmeans_clustering(test_data, K=2):
     # Output:
     # predicted_labels    num_test x 1 predicted vector with labels for the test data
 
+    # TODO: FIX!!!!
+
     # Link to the cost function of kMeans
     fun = lambda w: cost_kmeans(test_data, w)
-
 
     # the learning rate
     mu = 0.01
@@ -143,27 +141,30 @@ def kmeans_clustering(test_data, K=2):
     # iterations
     num_iter = 100
 
-    #------------------------------------------------------------------#
-    # TODO: Initialize cluster centers and store them in w_initial
-    #------------------------------------------------------------------#
+    N, M = test_data.shape
+    idx = np.random.randint(N, size=K)
+    w_initial = test_data[idx, :]
 
-    #Reshape centers to a vector (needed by ngradient)
-    w_vector = w_initial.reshape(K*M, 1)
+    # Reshape centers to a vector (needed by ngradient)
+    w_vector = w_initial.reshape(K * M, 1)
 
     for i in np.arange(num_iter):
         # gradient ascent
-        w_vector = w_vector - mu*reg.ngradient(fun,w_vector)
+        w_vector = w_vector - mu * util.ngradient(fun, w_vector)
 
-    #Reshape back to dataset
+    # Reshape back to dataset
     w_final = w_vector.reshape(K, M)
 
-    #------------------------------------------------------------------#
+    # ------------------------------------------------------------------#
     # TODO: Find distance of each point to each cluster center
     # Then find the minimum distances min_dist and indices min_index
-    #------------------------------------------------------------------#
+    # ------------------------------------------------------------------#
+    D = scipy.spatial.distance.cdist(test_data, w_final, metric='euclidean')
+    min_index = np.argmin(D, axis=1)
+    min_dist = np.min(D, axis=1)
 
     # Sort by intensity of cluster center
-    sorted_order = np.argsort(w_final[:,0], axis=0)
+    sorted_order = np.argsort(w_final[:, 0], axis=0)
 
     # Update the cluster indices based on the sorted order and return results in
     # predicted_labels
@@ -171,7 +172,7 @@ def kmeans_clustering(test_data, K=2):
     predicted_labels[:] = np.nan
 
     for i in np.arange(len(sorted_order)):
-        predicted_labels[min_index==sorted_order[i]] = i
+        predicted_labels[min_index == sorted_order[i]] = i
 
     return predicted_labels
 
@@ -188,13 +189,11 @@ def nn_classifier(train_data, train_labels, test_data):
     # Output:
     # predicted_labels   num_test x 1 predicted vector with labels for the test data
 
-    #------------------------------------------------------------------#
-    # TODO: Implement missing functionality
-    #------------------------------------------------------------------#
-
+    D = scipy.spatial.distance.cdist(test_data, train_data, metric='euclidean')
+    predicted_labels = train_labels[np.argmin(D, axis=1)]
 
     return predicted_labels
-    
+
 
 def knn_classifier(train_data, train_labels, test_data, k):
     # Returns the labels for test_data, predicted by the k-NN
@@ -206,15 +205,14 @@ def knn_classifier(train_data, train_labels, test_data, k):
     # k - Number of neighbors to take into account (1 by default)
     # Output:
     # predicted_labels - num_test x 1 predicted vector with labels for the test data
-    
+
     D = scipy.spatial.distance.cdist(test_data, train_data, metric='euclidean')
     sort_ix = np.argsort(D, axis=1)
-    sort_ix_k = sort_ix[:,:k] # Get the k smallest distances
+    sort_ix_k = sort_ix[:, :k]  # Get the k smallest distances
     predicted_labels = train_labels[sort_ix_k]
     predicted_labels = scipy.stats.mode(predicted_labels, axis=1)[0]
 
     return predicted_labels
-
 
 
 # SECTION 2. Generalization and overfitting
@@ -234,16 +232,16 @@ def mypca(X):
 
     X = X - np.mean(X, axis=0)
 
-    #------------------------------------------------------------------#
-    #TODO: Calculate covariance matrix of X, find eigenvalues and eigenvectors,
+    # ------------------------------------------------------------------#
+    # TODO: Calculate covariance matrix of X, find eigenvalues and eigenvectors,
     # sort them, and rotate X using the eigenvectors
 
-    #------------------------------------------------------------------#
+    # ------------------------------------------------------------------#
 
-    #Return fraction of variance
-    fraction_variance = np.zeros((X_pca.shape[1],1))
+    # Return fraction of variance
+    fraction_variance = np.zeros((X_pca.shape[1], 1))
     for i in np.arange(X_pca.shape[1]):
-        fraction_variance[i] = np.sum(w[:i+1])/np.sum(w)
+        fraction_variance[i] = np.sum(w[:i + 1]) / np.sum(w)
 
     return X_pca, v, w, fraction_variance
 
@@ -264,20 +262,20 @@ def segmentation_combined_atlas(train_labels_matrix, combining='mode'):
     r, c = train_labels_matrix.shape
 
     # Segment the test subject by each individual atlas
-    predicted_labels = np.empty([r,c])
+    predicted_labels = np.empty([r, c])
     predicted_labels[:] = np.nan
 
     for i in np.arange(c):
-        predicted_labels[:,i] = segmentation_atlas(None, train_labels_matrix[:,i], None)
+        predicted_labels[:, i] = segmentation_atlas(None, train_labels_matrix[:, i], None)
 
     # Combine labels
     # Option 1: Most frequent label
     if combining == 'mode':
         predicted_labels = scipy.stats.mode(predicted_labels, axis=1)[0]
-    
-    #------------------------------------------------------------------#
+
+    # ------------------------------------------------------------------#
     # TODO: Add options for combining with min and max
-    #------------------------------------------------------------------#
+    # ------------------------------------------------------------------#
     else:
         raise ValueError("No such combining type exists")
 
@@ -285,7 +283,6 @@ def segmentation_combined_atlas(train_labels_matrix, combining='mode'):
 
 
 def segmentation_atlas(train_data, train_labels, test_data):
-
     # Segments the image defined by test_subject and test_slice,
     # based only on the labels/atlases of the other subjects
     #
@@ -298,14 +295,13 @@ def segmentation_atlas(train_data, train_labels, test_data):
     # images are registered. But in practice, we would want to first do
     # registration on the image intensity
 
-    #Assume predicted labels are the atlas labels
+    # Assume predicted labels are the atlas labels
     predicted_labels = train_labels
 
     return predicted_labels
 
 
 def segmentation_combined_knn(train_data_matrix, train_labels_matrix, test_data, k=1):
-
     # Segments the image defined by test_data based on
     # kNN classifiers trained on data in train_data_matrix and
     # train_labels_matrix
@@ -322,20 +318,19 @@ def segmentation_combined_knn(train_data_matrix, train_labels_matrix, test_data,
 
     r, c = train_labels_matrix.shape
 
-    predicted_labels = np.empty([r,c])
+    predicted_labels = np.empty([r, c])
     predicted_labels[:] = np.nan
 
     for i in np.arange(c):
-        predicted_labels[:,i] = segmentation_knn(train_data_matrix[:,:,i], train_labels_matrix[:,i], test_data, k)
+        predicted_labels[:, i] = segmentation_knn(train_data_matrix[:, :, i], train_labels_matrix[:, i], test_data, k)
 
-    #Combine labels
+    # Combine labels
     predicted_labels = scipy.stats.mode(predicted_labels, axis=1)[0]
 
     return predicted_labels.astype(bool)
 
 
 def segmentation_knn(train_data, train_labels, test_data, k=1):
-
     # Segments the image using a knn classsifier trained on
     # train_data and train_labels
     #
@@ -348,19 +343,17 @@ def segmentation_knn(train_data, train_labels, test_data, k=1):
     # Output:
     # predicted_labels    Predicted labels for the test slice
 
-    
     # Subsample training data for efficiency
-    num_samples=3000
+    num_samples = 3000
     ix = np.random.randint(train_data.shape[0], size=num_samples)
 
-    subset_train_data = train_data[ix,:]
+    subset_train_data = train_data[ix, :]
     subset_train_labels = train_labels[ix]
 
-
-    #Normalize
+    # Normalize
     [train_data_norm, test_data_norm] = normalize_data(subset_train_data, test_data);
 
-    #Train and apply kNN classifier
+    # Train and apply kNN classifier
 
     # Option 1: The implementation we made in this course (slower)
     # predicted_labels = knn_classifier(train_data_norm, subset_train_labels, test_data_norm, k)
