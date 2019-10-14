@@ -17,11 +17,7 @@ def ngradient(fun, x, h=1e-3):
     # h - a small positive number used in the finite difference formula
     # Output:
     # g - vector of partial derivatives (gradient) of fun
-    # ------------------------------------------------------------------#
-    # TODO: Implement the  computation of the partial derivatives of
-    # the function at x with numerical differentiation.
-    # g[k] should store the partial derivative w.r.t. the k-th parameter
-    # ------------------------------------------------------------------#
+
     g = np.zeros_like(x)
 
     for i in range(len(x)):
@@ -60,6 +56,7 @@ def scatter_data(X, Y, feature0=0, feature1=1, ax=None):
         idx2 = indices2 == class_labels[i]
         lbl = 'X, class ' + str(i)
         ax.scatter(X[idx2, feature0], X[idx2, feature1], color=c, label=lbl)
+        # ax.legend()
 
     return ax
 
@@ -97,31 +94,47 @@ def extract_features(image_number, slice_number):
 
     t1 = plt.imread(base_dir + str(image_number) + '_' + str(slice_number) + '_t1.tif')
     t1g = scipy.ndimage.gaussian_filter(t1, sigma=1)
+    s1x = scipy.ndimage.sobel(t1, axis=0, mode='constant')
+    s1y = scipy.ndimage.sobel(t1, axis=1, mode='constant')
+    t1s = np.hypot(s1x, s1y)
 
     t2 = plt.imread(base_dir + str(image_number) + '_' + str(slice_number) + '_t2.tif')
-    t2g = scipy.ndimage.gaussian_filter(t1, sigma=1)
+    t2g = scipy.ndimage.gaussian_filter(t2, sigma=1)
+    s2x = scipy.ndimage.sobel(t2, axis=0, mode='constant')
+    s2y = scipy.ndimage.sobel(t2, axis=1, mode='constant')
+    t2s = np.hypot(s2x, s2y)
 
     n = t1.shape[0]
     features = ()
 
     t1f = t1.flatten().T.astype(float).reshape(-1, 1)
     t1gf = t1g.flatten().T.astype(float).reshape(-1, 1)
+    t1sf = t1s.flatten().T.astype(float).reshape(-1, 1)
 
     t2f = t2.flatten().T.astype(float).reshape(-1, 1)
     t2gf = t2g.flatten().T.astype(float).reshape(-1, 1)
+    t2sf = t2s.flatten().T.astype(float).reshape(-1, 1)
+
+    t_diff = np.abs(t1f - t2f)
 
     r, _ = seg.extract_coordinate_feature(t1)
 
     X = np.concatenate((t1f, t2f), axis=1)
     X = np.concatenate((X, t1gf), axis=1)
     X = np.concatenate((X, t2gf), axis=1)
-    # X = np.concatenate((X, r), axis=1)
+    X = np.concatenate((X, t1sf), axis=1)
+    X = np.concatenate((X, t2sf), axis=1)
+    X = np.concatenate((X, t_diff), axis=1)
+    X = np.concatenate((X, r), axis=1)
 
     features += ('T1 intensity',)
     features += ('T2 intensity',)
     features += ('T1 intensity gaussian filter',)
     features += ('T2 intensity gaussian filter',)
-    # features += ('distance to center',)
+    features += ('T1 intensity sobel filter',)
+    features += ('T2 intensity sobel filter',)
+    features += ('abs(T1 - T2)',)
+    features += ('distance to center',)
 
     return X, features
 
@@ -156,16 +169,15 @@ def create_labels(image_number, slice_number, task):
 
     if task == 'brain':
         Y = I > 0
-    elif task == 'brain':
-        white_matter = I == 2 | I == 5
-        gray_matter = I == 7 | I == 3
-        csf = I == 4 | I == 8
-        background = I == 0 | I == 1 | I == 6
-        Y = I
-        Y[background] = 0
-        Y[white_matter] = 1
-        Y[gray_matter] = 2
-        Y[csf] = 3
+    elif task == 'tissue':
+        white_matter = np.logical_or(I == 2, I == 5).astype(int)
+        gray_matter = np.logical_or(I == 7, I == 3).astype(int)
+        csf = np.logical_or(I == 4, I == 8).astype(int)
+        background = np.logical_or(I == 0, np.logical_or(I == 1, I == 6)).astype(int)
+        Y = np.zeros_like(I)
+        Y = Y + white_matter
+        Y = Y + gray_matter * 2
+        Y = Y + csf * 3
     else:
         print(task)
         raise ValueError("Variable 'task' must be one of two values: 'brain' or 'tissue'")
@@ -190,9 +202,6 @@ def dice_overlap(true_labels, predicted_labels, smooth=1.):
     t = true_labels.flatten()
     p = predicted_labels.flatten()
 
-    # ------------------------------------------------------------------#
-    # TODO: Implement the missing functionality for Dice overlap
-    # ------------------------------------------------------------------#
     tp = (t * p).astype(int)
     dice = 2 * np.sum(tp) / (2 * np.sum(tp) + np.sum(t != p))
 
@@ -250,9 +259,6 @@ def classification_error(true_labels, predicted_labels):
     t = true_labels.flatten()
     p = predicted_labels.flatten()
 
-    # ------------------------------------------------------------------#
-    # TODO: Implement the missing functionality for classification error
-    # ------------------------------------------------------------------#
     err = np.sum(t != p) / t.shape
 
     return err

@@ -237,13 +237,6 @@ def mutual_information_test():
     MI1 = reg.mutual_information(p1)
     MI2 = reg.mutual_information(p2)
 
-
-    # ------------------------------------------------------------------#
-    # TODO: Implement a few tests of the mutual_information definition
-    # ------------------------------------------------------------------#
-
-
-
     assert 1 - MI1 < 10e-10, error_msg + " (self MI should be 1)"
     assert MI2 < 0.8, error_msg + " (mirrored image gives MI above 0.8 (strange))"
 
@@ -273,10 +266,6 @@ def ngradient_test():
     exponential = lambda x: np.exp(x)
     g1 = reg.ngradient(exponential, np.ones((1,)))
     assert abs(g1 - exponential(1)) < 1e-5, "Numerical gradient is incorrectly implemented (exponential test)"
-
-    # ------------------------------------------------------------------#
-    # TODO: Implement a few more test cases of ngradient
-    # ------------------------------------------------------------------#
 
     print('Test successful!')
 

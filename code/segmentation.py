@@ -120,6 +120,7 @@ def cost_kmeans(X, w_vector):
     return J
 
 
+'''
 def kmeans_clustering(test_data, K=2):
     # Returns the labels for test_data, predicted by the kMeans
     # classifier which assumes that clusters are ordered by intensity
@@ -145,6 +146,8 @@ def kmeans_clustering(test_data, K=2):
     idx = np.random.randint(N, size=K)
     w_initial = test_data[idx, :]
 
+
+
     # Reshape centers to a vector (needed by ngradient)
     w_vector = w_initial.reshape(K * M, 1)
 
@@ -155,13 +158,77 @@ def kmeans_clustering(test_data, K=2):
     # Reshape back to dataset
     w_final = w_vector.reshape(K, M)
 
-    # ------------------------------------------------------------------#
-    # TODO: Find distance of each point to each cluster center
-    # Then find the minimum distances min_dist and indices min_index
-    # ------------------------------------------------------------------#
     D = scipy.spatial.distance.cdist(test_data, w_final, metric='euclidean')
     min_index = np.argmin(D, axis=1)
     min_dist = np.min(D, axis=1)
+
+    # Sort by intensity of cluster center
+    sorted_order = np.argsort(w_final[:, 0], axis=0)
+
+    # Update the cluster indices based on the sorted order and return results in
+    # predicted_labels
+    predicted_labels = np.empty(*min_index.shape)
+    predicted_labels[:] = np.nan
+
+    for i in np.arange(len(sorted_order)):
+        predicted_labels[min_index == sorted_order[i]] = i
+
+    return predicted_labels
+'''
+
+
+def kmeans_clustering(test_data, K=4):
+    # Returns the labels for test_data, predicted by the kMeans
+    # classifier which assumes that clusters are ordered by intensity
+    #
+    # Input:
+    # test_data          num_test x p matrix with features for the test data
+    # k                  Number of clusters to take into account (2 by default)
+    # Output:
+    # predicted_labels    num_test x 1 predicted vector with labels for the test data
+
+    # Link to the cost function of kMeans
+    fun = lambda w: cost_kmeans(test_data, w)
+
+    # the learning rate
+    mu = 0.01
+
+    # iterations
+    num_iter = 100
+
+    # ------------------------------------------------------------------#
+    test_data = np.array([test_data]).T
+    M = test_data.shape[1]
+    w_initial = np.zeros((K, M))
+    n = np.random.randint(0, 100, size=(1, K))
+    n = np.sort(n)
+    for i in range(K):
+        m = n[0, i]
+        w_initial[i, :] = test_data[m, :]
+    # ------------------------------------------------------------------#
+
+    # Reshape centers to a vector (needed by ngradient)
+    w_vector = w_initial.reshape(K * M, 1)
+
+    import segmentation_util as util
+    for i in np.arange(num_iter):
+        # gradient ascent
+        w_vector = w_vector - mu * util.ngradient(fun, w_vector)
+
+    # Reshape back to dataset
+    w_final = w_vector.reshape(K, M)
+
+    # ------------------------------------------------------------------#
+    # Then find the minimum distances min_dist and indices min_index
+    from scipy import spatial
+    D = spatial.distance.cdist(test_data, w_initial, metric='euclidean')
+    # For each row/sample in D, which column has the minimum value...
+    # (i.e. to which point in w_initial iprint(min_index.shape[0])s this sample the closest)
+    min_index = np.argmin(D, axis=1)
+    for i in range(len(min_index.shape)):
+        p = min_index[i]
+        min_dist = D[:, p]
+    # ------------------------------------------------------------------#
 
     # Sort by intensity of cluster center
     sorted_order = np.argsort(w_final[:, 0], axis=0)
@@ -230,19 +297,14 @@ def mypca(X):
     # fraction_variance - kx1 vector which stores how much variance
     #                     is retained in the k components
 
-    X = X - np.mean(X, axis=0)
-
-    # ------------------------------------------------------------------#
-    # TODO: Calculate covariance matrix of X, find eigenvalues and eigenvectors,
-    # sort them, and rotate X using the eigenvectors
-    # ------------------------------------------------------------------#
+    X = X - np.mean(X)
 
     sigma = np.cov(X.T)
     w, v = np.linalg.eig(sigma)
 
     ix = np.argsort(w)[::-1]
-    w = w[ix]
-    v = v[:, ix]
+    w = w[ix]  # eigenvalues
+    v = v[:, ix]  # eigenvectors
 
     X_pca = v.T.dot(X.T).T
 
@@ -280,14 +342,14 @@ def segmentation_combined_atlas(train_labels_matrix, combining='mode'):
     # Option 1: Most frequent label
     if combining == 'mode':
         predicted_labels = scipy.stats.mode(predicted_labels, axis=1)[0]
-
-    # ------------------------------------------------------------------#
-    # TODO: Add options for combining with min and max
-    # ------------------------------------------------------------------#
+    elif combining == 'min':
+        predicted_labels = np.min(predicted_labels, axis=1)
+    elif combining == 'max':
+        predicted_labels = np.max(predicted_labels, axis=1)
     else:
         raise ValueError("No such combining type exists")
 
-    return predicted_labels.astype(bool)
+    return predicted_labels.astype(int)
 
 
 def segmentation_atlas(train_data, train_labels, test_data):
@@ -335,7 +397,7 @@ def segmentation_combined_knn(train_data_matrix, train_labels_matrix, test_data,
     # Combine labels
     predicted_labels = scipy.stats.mode(predicted_labels, axis=1)[0]
 
-    return predicted_labels.astype(bool)
+    return predicted_labels
 
 
 def segmentation_knn(train_data, train_labels, test_data, k=1):

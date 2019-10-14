@@ -37,9 +37,6 @@ def scatter_data_test(showFigs=True):
     if showFigs:
         ax = util.scatter_data(X_data, Y, 0, 1)
         return X_data, Y
-    # ------------------------------------------------------------------#
-    # TODO: Implement a few test cases of with different features
-    # ------------------------------------------------------------------#
 
     return X_data, Y
 
@@ -66,9 +63,6 @@ def scatter_t2_test(showFigs=True):
     if showFigs:
         util.scatter_data(X_data, Y, 0, 1)
 
-    # ------------------------------------------------------------------#
-    # TODO: Extract features from the T2 image and compare them to the T1 features
-    # ------------------------------------------------------------------#
     return X_data, Y
 
 
@@ -104,10 +98,6 @@ def normalized_stats_test():
 
 
 def distance_test():
-    # ------------------------------------------------------------------#
-    # TODO: Generate a Gaussian dataset, with 100 samples per class, and compute the distances.
-    #  Use plt.imshow() to visualize the distance matrix as an image.
-    # ------------------------------------------------------------------#
     X, Y = seg.generate_gaussian_data()
     D = scipy.spatial.distance.cdist(X, X, metric='euclidean')
     ax = plt.imshow(D)
@@ -122,12 +112,6 @@ def small_samples_distance_test():
 
 
 def minimum_distance_test(X, Y, C, D):
-    # ------------------------------------------------------------------#
-    # TODO: plot the datasets on top of each other in different colors and visualize the data,
-    #  calculate the distances between the datasets,
-    #  order the distances (min to max) using the provided code,
-    #  calculate how many samples are closest to each of the samples in `C`
-    # ------------------------------------------------------------------#
     plt.plot(X[:, 0], X[:, 1], '.r')
     plt.plot(C, '.b')
     min_index = np.argmin(D, axis=1)
@@ -138,10 +122,6 @@ def minimum_distance_test(X, Y, C, D):
 
 
 def distance_classification_test():
-    # ------------------------------------------------------------------#
-    # TODO: Use the provided code to generate training and testing data
-    #  Classify the points in test_data, based on their distances d to the points in train_data
-    # ------------------------------------------------------------------#
     train_data, train_labels = seg.generate_gaussian_data(2)
     test_data, test_labels = seg.generate_gaussian_data(1)
 
@@ -234,9 +214,6 @@ def kmeans_demo():
 
 
 def kmeans_clustering_test():
-    # ------------------------------------------------------------------#
-    # TODO: Store errors for training data
-    # ------------------------------------------------------------------#
     I = plt.imread('../data/dataset_brains/1_1_t1.tif')
     X, _ = seg.normalize_data(I)
     labels = seg.kmeans_clustering(X)
@@ -287,10 +264,6 @@ def generate_train_test(N, task):
 
 
 def easy_hard_data_classifier_test():
-    # -------------------------------------------------------------------#
-    # TODO: generate and classify (using nn_classifier) 2 pairs of datasets (easy and hard)
-    # calculate classification error in each case
-    # -------------------------------------------------------------------#
     train_data_easy, train_label_easy, test_data_easy, test_label_easy = generate_train_test(50, 'easy')
     train_data_hard, train_label_hard, test_data_hard, test_label_hard = generate_train_test(50, 'hard')
 
@@ -529,10 +502,6 @@ def feature_curve(use_random=False):
     yerr_test = np.std(test_error, 1)
     p1 = ax1.errorbar(x, y_test, yerr=yerr_test, label='Test error')
 
-    # ------------------------------------------------------------------#
-    # TODO: Plot training size
-    # ------------------------------------------------------------------#
-
     ax1.set_xlabel('Number of features')
     ax1.set_ylabel('Error')
     ax1.grid()
@@ -613,7 +582,7 @@ def eigen_vecval_test(sigma):
 
 
 def rotate_using_eigenvectors_test(X, Y, v):
-    return v.T.dot(X.T)
+    return v.T.dot(X.T).T
 
 
 def test_mypca():
@@ -678,13 +647,21 @@ def segmentation_combined_atlas_test():
         all_data_matrix[:, :, i] = train_data
         all_labels_matrix[:, i] = train_labels.ravel()
 
-    # ------------------------------------------------------------------#
-    # TODO: Use provided code to Combine labels of training images,
-    #  Convert combined label into mask image,
-    #  Convert true label into mask image, and
-    #  View both masks on the same axis,
-    #  Also calculate dice coefficient and error
-    # ------------------------------------------------------------------#
+    # Combine labels of training images:
+    predicted_labels = seg.segmentation_combined_atlas(all_labels_matrix, combining='mode')
+
+    # Convert combined label into mask image:
+    predicted_mask = predicted_labels.reshape(240, 240)
+
+    # Convert true label into mask image:
+    true_mask = all_labels_matrix[:, 4].reshape(240, 240)
+
+    plt.imshow(predicted_mask + true_mask)
+
+    err = util.classification_error(true_mask, predicted_mask)
+    dice = util.dice_overlap(true_mask, predicted_mask)
+
+    print("error: {0}, dice: {1}".format(err, dice))
 
 
 def segmentation_combined_atlas_minmax_test():
@@ -702,19 +679,28 @@ def segmentation_combined_atlas_minmax_test():
         all_data_matrix[:, :, i] = train_data
         all_labels_matrix[:, i] = train_labels.ravel()
 
-    predicted_labels_min = seg.segmentation_combined_atlas(all_labels_matrix, combining='min')
-    predicted_labels_max = seg.segmentation_combined_atlas(all_labels_matrix, combining='max')
+    predicted_labels = seg.segmentation_combined_knn(all_data_matrix[:, :, :n - 2], all_labels_matrix[:, :n - 2],
+                                                     all_data_matrix[:, :, n - 1])
 
-    test_labels = all_labels_matrix[:, 4].astype(bool)
+    # predicted_labels_max = seg.segmentation_combined_atlas(all_labels_matrix, combining='max')
+    # predicted_labels_min = seg.segmentation_combined_atlas(all_labels_matrix, combining='min')
 
-    print('Combining method = min:')
-    err = util.classification_error(test_labels, predicted_labels_min)
+    test_labels = all_labels_matrix[:, n - 1].astype(bool)
+
+    # print('Combining method = min:')
+    # err = util.classification_error(test_labels, predicted_labels_min)
+    # print('Error:\n{}'.format(err))
+    # dice = util.dice_overlap(test_labels, predicted_labels_min)
+    # print('Dice coefficient:\n{}'.format(dice))
+
+    print()
+
+    print('Combining knn')
+    err = util.classification_error(test_labels, predicted_labels)
     print('Error:\n{}'.format(err))
-    dice = util.dice_overlap(test_labels, predicted_labels_min)
+    dice = util.dice_overlap(test_labels, predicted_labels)
     print('Dice coefficient:\n{}'.format(dice))
 
-    print('Combining method = max:')
-    err = util.classification_error(test_labels, predicted_labels_max)
-    print('Error:\n{}'.format(err))
-    dice = util.dice_overlap(test_labels, predicted_labels_max)
-    print('Dice coefficient:\n{}'.format(dice))
+    plt.imshow(predicted_labels.reshape(240, 240))
+    plt.show()
+    plt.imshow(test_labels.reshape(240, 240))
