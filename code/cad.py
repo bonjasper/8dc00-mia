@@ -19,6 +19,7 @@ def sigmoid(a):
     #  is [1 -1 2] the output should be a vector of the same size with the
     #  sigmoid values for every element of the input vector.
     #-------------------------------------------------------------------#
+    s = 1/(1+np.exp(-a))
 
     return s
 
@@ -35,6 +36,8 @@ def lr_nll(X, Y, Theta):
 
     # compute the predicted probability by the logistic regression model
     p = sigmoid(X.dot(Theta))
+
+    L = - np.sum(Y*np.log(p) + (1-Y)*np.log(1-p))
 
     #-------------------------------------------------------------------#
     # TODO: Implement the expression for the NLL.

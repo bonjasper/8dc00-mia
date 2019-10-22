@@ -26,10 +26,10 @@ def segmentation_mymethod(train_data_matrix, train_labels_matrix, test_data, tas
 
     predicted_labels_1 = seg.segmentation_combined_knn(train_data_matrix, train_labels_matrix, test_data, k=5)
     predicted_labels_2 = seg.segmentation_combined_knn(train_data_matrix, train_labels_matrix, test_data, k=1)
-    predicted_labels_3 = seg.segmentation_combined_atlas(train_labels_matrix)
+    predicted_labels_2 = seg.segmentation_combined_atlas(train_labels_matrix)
 
     predicted_labels = np.concatenate((predicted_labels_1, predicted_labels_2), axis=1)
-    predicted_labels = np.concatenate((predicted_labels, predicted_labels_3), axis=1)
+    # predicted_labels = np.concatenate((predicted_labels, predicted_labels_3), axis=1)
 
     predicted_labels = seg.segmentation_combined_atlas(predicted_labels, combining='mode')
     # predicted_labels = scipy.ndimage.median_filter(predicted_labels.reshape(240, 240), size=3)

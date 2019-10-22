@@ -56,8 +56,8 @@ def plot_curve(X, Theta, ax):
             expandedX = X**(k+1)
             expandedRangeX = rangeX**(k+1)
         else:
-            expandedX = np.concatenate((expandedX, X**(k+1)), axis=1)
-            expandedRangeX = np.concatenate((expandedRangeX, rangeX**(k+1)), axis=1)
+            expandedX = np.concatenate((X**(k+1), expandedX), axis=1)
+            expandedRangeX = np.concatenate((rangeX**(k+1), expandedRangeX), axis=1)
 
     ax.plot(rangeX, addones(expandedRangeX).dot(Theta), linewidth=2, label='Regression curve')
 

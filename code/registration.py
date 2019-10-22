@@ -296,8 +296,8 @@ def ngradient(fun, x, h=1e-3):
         par1[i] += h / 2
         par2[i] -= h / 2
 
-        y1 = fun(par1)[0]
-        y2 = fun(par2)[0]
+        y1 = fun(par1)
+        y2 = fun(par2)
 
         g[i] = (y1 - y2) / h
 
